@@ -1,0 +1,168 @@
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+// Observer Pattern
+interface ChatObserver {
+    void update(String message);
+}
+
+// User Class implementing Observer
+class User implements ChatObserver {
+    private String username;
+    private ChatRoom currentRoom;
+
+    public User(String username) {
+        this.username = username;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void joinRoom(ChatRoom room) {
+        this.currentRoom = room;
+        room.addUser(this);
+        System.out.println(username + " joined the room " + room.getRoomId());
+    }
+
+    public void leaveRoom() {
+        if (currentRoom != null) {
+            currentRoom.removeUser(this);
+            System.out.println(username + " left the room " + currentRoom.getRoomId());
+            this.currentRoom = null;
+        }
+    }
+
+    public void sendMessage(String message) {
+        if (currentRoom != null) {
+            currentRoom.broadcastMessage(username + ": " + message);
+        }
+    }
+
+    @Override
+    public void update(String message) {
+        System.out.println(username + " received message: " + message);
+    }
+}
+
+// Chat Room acting as Subject in Observer Pattern
+class ChatRoom {
+    private String roomId;
+    private List<ChatObserver> users;
+    private List<String> messageHistory;
+
+    public ChatRoom(String roomId) {
+        this.roomId = roomId;
+        this.users = new ArrayList<>();
+        this.messageHistory = new ArrayList<>();
+    }
+
+    public String getRoomId() {
+        return roomId;
+    }
+
+    public void addUser(ChatObserver user) {
+        users.add(user);
+        broadcastMessage("User joined: " + ((User) user).getUsername());
+        notifyMessageHistory(user);  // Send message history to the newly joined user
+    }
+
+    public void removeUser(ChatObserver user) {
+        users.remove(user);
+        broadcastMessage("User left: " + ((User) user).getUsername());
+    }
+
+    public void broadcastMessage(String message) {
+        messageHistory.add(message);
+        for (ChatObserver user : users) {
+            user.update(message);
+        }
+    }
+
+    private void notifyMessageHistory(ChatObserver user) {
+        for (String message : messageHistory) {
+            user.update(message);
+        }
+    }
+
+    public List<String> getMessageHistory() {
+        return messageHistory;
+    }
+}
+
+// Singleton Pattern for managing chat rooms
+class ChatRoomManager {
+    private static ChatRoomManager instance;
+    private Map<String, ChatRoom> chatRooms;
+
+    private ChatRoomManager() {
+        chatRooms = new HashMap<>();
+    }
+
+    public static ChatRoomManager getInstance() {
+        if (instance == null) {
+            instance = new ChatRoomManager();
+        }
+        return instance;
+    }
+
+    public ChatRoom getChatRoom(String roomId) {
+        return chatRooms.computeIfAbsent(roomId, ChatRoom::new);
+    }
+}
+
+// Adapter Pattern for different communication protocols
+interface CommunicationProtocol {
+    void sendMessage(User user, String message);
+}
+
+class WebSocketAdapter implements CommunicationProtocol {
+    @Override
+    public void sendMessage(User user, String message) {
+        System.out.println("WebSocket: Sending message from " + user.getUsername() + ": " + message);
+    }
+}
+
+class HTTPAdapter implements CommunicationProtocol {
+    @Override
+    public void sendMessage(User user, String message) {
+        System.out.println("HTTP: Sending message from " + user.getUsername() + ": " + message);
+    }
+}
+
+// Main class demonstrating chat functionality
+public class ChatApplication {
+    public static void main(String[] args) {
+        // Create Singleton instance of ChatRoomManager
+        ChatRoomManager chatRoomManager = ChatRoomManager.getInstance();
+
+        // Create or get chat rooms
+        ChatRoom room1 = chatRoomManager.getChatRoom("Room123");
+        ChatRoom room2 = chatRoomManager.getChatRoom("RoomABC");
+
+        // Create users
+        User alice = new User("Alice");
+        User bob = new User("Bob");
+
+        // Users join chat rooms
+        alice.joinRoom(room1);
+        bob.joinRoom(room1);
+
+        // Users send messages
+        alice.sendMessage("Hello, everyone!");
+        bob.sendMessage("Hi Alice!");
+
+        // Leave and rejoin
+        alice.leaveRoom();
+        alice.joinRoom(room2);
+
+        // Adapter pattern: Sending messages via different protocols
+        CommunicationProtocol webSocket = new WebSocketAdapter();
+        CommunicationProtocol httpProtocol = new HTTPAdapter();
+
+        webSocket.sendMessage(bob, "This is a WebSocket message");
+        httpProtocol.sendMessage(alice, "This is an HTTP message");
+    }
+}
